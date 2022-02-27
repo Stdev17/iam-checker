@@ -7,7 +7,9 @@ import (
     "bufio"
     "io"
     "os"
+    "strconv"
     "encoding/json"
+    "github.com/joho/godotenv"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/iam"
@@ -20,8 +22,28 @@ type IAMProfile struct {
 }
 
 func main() {
-    _, err := FetchIAM()
+
+    err := godotenv.Load(".env")
     if err != nil {
+        log.Fatalf("Error loading .env file")
+        return
+    }
+
+    elapsedTime, err := strconv.Atoi(os.Getenv("LIFETIME"))
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
+
+    fetched, err := FetchIAM()
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
+
+    filtered := CheckProfileExpired(time.Duration(time.Hour * time.Duration(elapsedTime)), fetched)
+
+    if SaveTargetIAMProfiles(filtered) != nil {
         log.Fatal(err)
         return
     }
@@ -36,26 +58,46 @@ func FetchIAM() ([]IAMProfile, error) {
         return nil, err
     }
 
+    var IAMs []IAMProfile
+    var iam_users []string
+
     client := iam.NewFromConfig(cfg)
     maxItems := int32(1000)
-    input := &iam.ListAccessKeysInput{
+
+    // fetch IAM Users first
+    input := &iam.ListUsersInput{
         MaxItems: aws.Int32(maxItems),
     }
 
-    fetched, err := client.ListAccessKeys(context.TODO(), input)
+    list_users, err := client.ListUsers(context.TODO(), input)
     if err != nil {
         return nil, err
     }
 
-    var IAMs []IAMProfile
+    for _, u := range list_users.Users {
+        iam_users = append(iam_users, *u.UserName)
+    }
 
-    for _, key := range fetched.AccessKeyMetadata {
-        tmp := IAMProfile{
-            AccessKeyId: *key.AccessKeyId,
-            UserName: string(*key.UserName),
-            CreatedDate: *key.CreateDate,
+    // now we fetch IAM profiles
+    for _, u := range iam_users {
+        input := &iam.ListAccessKeysInput{
+            MaxItems: aws.Int32(maxItems),
+            UserName: aws.String(u),
         }
-        IAMs = append(IAMs, tmp)
+
+        fetched, err := client.ListAccessKeys(context.TODO(), input)
+        if err != nil {
+            return nil, err
+        }
+
+        for _, key := range fetched.AccessKeyMetadata {
+            tmp := IAMProfile{
+                AccessKeyId: *key.AccessKeyId,
+                UserName: string(*key.UserName),
+                CreatedDate: *key.CreateDate,
+            }
+            IAMs = append(IAMs, tmp)
+        }
     }
 
     return IAMs, nil
