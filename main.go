@@ -4,35 +4,35 @@ import (
     "context"
     "log"
     "time"
+    "bufio"
+    "io"
+    "os"
+    "encoding/json"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type IAMProfile struct {
-    accessKeyId string
-    userName string
-    createdDate time.Time
+    UserName string `json:"userName, string"`
+    AccessKeyId string `json:"accessKeyId, string"`
+    CreatedDate time.Time `json:"createdDate, string"`
 }
 
 func main() {
     _, err := FetchIAM()
     if err != nil {
-        //
+        log.Fatal(err)
         return
     }
 
     return
-    //for _, obj := range results {
-    //    log.Print(obj.(string))
-    //}
 }
 
 // FetchIAM connects to AWS SDK API with an IAM access key pair and fetch the IAM access key data from its account.
 func FetchIAM() ([]IAMProfile, error) {
     cfg, err := config.LoadDefaultConfig(context.TODO())
     if err != nil {
-        log.Fatal(err)
         return nil, err
     }
 
@@ -44,7 +44,6 @@ func FetchIAM() ([]IAMProfile, error) {
 
     fetched, err := client.ListAccessKeys(context.TODO(), input)
     if err != nil {
-        log.Fatal(err)
         return nil, err
     }
 
@@ -52,9 +51,9 @@ func FetchIAM() ([]IAMProfile, error) {
 
     for _, key := range fetched.AccessKeyMetadata {
         tmp := IAMProfile{
-            accessKeyId: *key.AccessKeyId,
-            userName: string(*key.UserName),
-            createdDate: *key.CreateDate,
+            AccessKeyId: *key.AccessKeyId,
+            UserName: string(*key.UserName),
+            CreatedDate: *key.CreateDate,
         }
         IAMs = append(IAMs, tmp)
     }
@@ -66,10 +65,34 @@ func FetchIAM() ([]IAMProfile, error) {
 func CheckProfileExpired(hour time.Duration, given []IAMProfile) ([]IAMProfile) {
     var filtered []IAMProfile
     for _, val := range given {
-        if val.createdDate.Add(hour).Before(time.Now()) {
+        if val.CreatedDate.Add(hour).Before(time.Now()) {
             filtered = append(filtered, val)
         }
     }
 
     return filtered
+}
+
+// SaveTargetIAMProfiles saves a file which contains UserName, Access Key ID, Lifetime of the target IAM profiles.
+func SaveTargetIAMProfiles(given []IAMProfile) (error) {
+    // marshaling phase
+    buf, _ := json.MarshalIndent(given, "", "    ")
+
+    // write phase
+    result, err := os.Create("/Users/leta/Github/iam-checker/" + string([]byte(time.Now().String())[:19]) +".json")
+    if err != nil {
+        return err
+    }
+    defer result.Close()
+
+    w := bufio.NewWriter(result)
+    for _, b := range buf {
+        err := w.WriteByte(b)
+        if err == io.EOF {
+            break
+        }
+    }
+    w.Flush()
+
+    return nil
 }
