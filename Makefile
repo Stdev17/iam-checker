@@ -32,4 +32,4 @@ vet:
 test: test_ vet
 
 release: 
-	docker build -t iam-checker:v1 .
+	docker build -t dsdego/iam-checker:latest .

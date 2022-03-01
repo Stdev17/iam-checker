@@ -12,7 +12,7 @@ import (
 
 // SaveTargetIAMProfiles saves a file which contains UserName, Access Key ID, Lifetime of the target IAM profiles.
 func SaveTargetIAMProfiles(given []IAMProfile) error {
-	// logging
+	// logging for monitoring
 	log.Print(given)
 
 	// marshaling phase

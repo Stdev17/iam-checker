@@ -1,10 +1,8 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -16,22 +14,25 @@ type IAMProfile struct {
 }
 
 func main() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
 
-	err = godotenv.Load(filepath.Join(cwd, ".env"))
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-		return
-	}
+	//err = godotenv.Load(filepath.Join(cwd, ".env"))
+	//if err != nil {
+	//	log.Fatalf("Error loading .env file")
+	//	return
+	//}
 
-	elapsedTime, err := strconv.Atoi(os.Getenv("LIFETIME"))
-	if err != nil {
-		log.Fatal(err)
-		return
+	lifetime := os.Getenv("LIFETIME")
+	lifetime = "1"
+
+	var elapsedTime int
+	var err error
+
+	if lifetime != "" {
+		elapsedTime, err = strconv.Atoi(lifetime)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 	}
 
 	fetched, err := FetchIAM()
