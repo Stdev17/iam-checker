@@ -22,7 +22,6 @@ func main() {
 	//}
 
 	lifetime := os.Getenv("LIFETIME")
-	lifetime = "1"
 
 	var elapsedTime int
 	var err error
